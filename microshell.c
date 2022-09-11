@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -93,10 +94,32 @@ void	parser( List *list, char **av, int ac )
 	push_list( &list, av + j, 0, CMD );
 }
 
+int	_cd(List **list)
+{
+	int ret = 0;
+
+	if ( !(*list)->data[1] || (*list)->data[2] )
+	{
+		write(2, "error: cd: bad arguments\n", 25);
+		ret = 2;
+	}	
+	else if ( chdir((*list)->data[1]) )
+	{
+		write(2, "error: cd: cannot change directory to ", 38);
+		write(2, (*list)->data[1], ft_strlen((*list)->data[1]) );
+		write(2, "\n", 1);
+		ret = 2;
+	}
+	(*list) = (*list)->next;
+	return (ret);
+}
+
 int	simple_exec( List **list, char **envp )
 {
 	int pid, status;
 
+	if ( strcmp((*list)->data[0], "cd") == 0 )
+		return (_cd(list));
 	if ( ( pid = fork() ) < 0 )
 		exit_fatal();
 	if (pid == 0)
@@ -124,7 +147,6 @@ void	start_pipe( List *list, char **envp, int *fds )
 		dup2(fds[1], 1);
 		close(fds[0]);
 		close(fds[1]);
-		close(0); // ?
 		execve( list->data[0], list->data, envp );
 		close(fds[1]);
 		exit_cmd_error(list->data[0]);
@@ -149,7 +171,6 @@ void	mid_pipe( List *list, char **envp, int *fds )
 		close(fds[0]);
 		close(fds[1]);
 		close(old_in);
-		dprintf(2, "coucou\n");
 		execve( list->data[0], list->data, envp );
 		exit_cmd_error(list->data[0]);
 	}
