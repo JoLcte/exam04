@@ -51,7 +51,7 @@ void	exit_cmd_error( char const *cmd )
 {
 	write(2, "error: cannot execute ", 22);
 	write(2, cmd, ft_strlen(cmd));
-	write(2, "\n",1);
+	write(2, "\n", 1);
 	clear_list(g_list);
 	exit(127);
 }
@@ -61,18 +61,18 @@ void	push_list( List **list, char **av, int size, int type )
 	if ( !( (*list)->next = malloc(sizeof(List)) ) )
 		exit_fatal();
 	(*list) = (*list)->next;
-	(*list)->type = type;
 	(*list)->data = av - size;
+	(*list)->next = NULL;
+	(*list)->type = type;
 	if (type)
 		*av = NULL; //for execve to stop
-	(*list)->next = NULL;
 }
 
 void	parser( List *list, char **av, int ac )
 {
 	int i = 1;
 	int j = 1;
-	
+
 	while ( i < ac )
 	{
 		if ( av[i][0] == '|' && !av[i][1] )
@@ -86,47 +86,46 @@ void	parser( List *list, char **av, int ac )
 			j = i + 1;
 		}
 		++i;
-
 	}
 	push_list( &list, av + j, 0, CMD );
 }
 
-int	_cd(List **list)
+int		_cd( List **list )
 {
 	int ret = 0;
 
-	if ( !(*list)->data[1] || (*list)->data[2] )
+	if ( !((*list)->data[1]) || (*list)->data[2] )
 	{
 		write(2, "error: cd: bad arguments\n", 25);
 		ret = 2;
-	}	
+	}
 	else if ( chdir((*list)->data[1]) )
 	{
 		write(2, "error: cd: cannot change directory to ", 38);
-		write(2, (*list)->data[1], ft_strlen((*list)->data[1]) );
+		write(2, (*list)->data[1], ft_strlen((*list)->data[1]));
 		write(2, "\n", 1);
 		ret = 2;
 	}
 	(*list) = (*list)->next;
-	return (ret);
+	return ret;
 }
 
-int	simple_exec( List **list, char **envp )
+int		simple_exec( List **list, char **envp )
 {
 	int pid, status;
 
 	if ( strcmp((*list)->data[0], "cd") == 0 )
-		return (_cd(list));
-	if ( ( pid = fork() ) < 0 )
+		return ( _cd(list) );
+	if ( (pid = fork()) < 0 )
 		exit_fatal();
-	if (pid == 0)
+	if ( pid == 0 )
 	{
 		execve((*list)->data[0], (*list)->data, envp);
 		exit_cmd_error((*list)->data[0]);
 	}
 	status = 0;
 	waitpid(pid, &status, WUNTRACED);
-	(*list) = (*list)->next;
+	*list = (*list)->next;
 	return (status);
 }
 
@@ -137,13 +136,13 @@ void	start_pipe( List *list, char **envp, int *fds )
 	if ( (pipe(fds)) < 0 )
 		exit_fatal();
 	pid = fork();
-	if (pid < 0)
+	if ( pid < 0 )
 		exit_fatal();
 	else if ( pid == 0 )
 	{
-		dup2(fds[1], 1);
-		close(fds[0]);
+		dup2(fds[1], 1); // we take from stdin here
 		close(fds[1]);
+		close(fds[0]);
 		execve( list->data[0], list->data, envp );
 		exit_cmd_error(list->data[0]);
 	}
@@ -153,20 +152,20 @@ void	start_pipe( List *list, char **envp, int *fds )
 void	mid_pipe( List *list, char **envp, int *fds )
 {
 	int pid;
-	int old_in = fds[0];
+	int	old_in = fds[0];
 
 	if ( (pipe(fds)) < 0 )
 		exit_fatal();
 	pid = fork();
-	if (pid < 0)
+	if ( pid < 0 )
 		exit_fatal();
 	else if ( pid == 0 )
 	{
 		dup2(old_in, 0);
 		dup2(fds[1], 1);
+		close(old_in);
 		close(fds[0]);
 		close(fds[1]);
-		close(old_in);
 		execve( list->data[0], list->data, envp );
 		exit_cmd_error(list->data[0]);
 	}
@@ -174,11 +173,10 @@ void	mid_pipe( List *list, char **envp, int *fds )
 	close(fds[1]);
 }
 
-int	end_pipe( List *list, char **envp, int *fds)
+int		end_pipe( List *list, char **envp, int *fds )
 {
-	int pid;
-	
-	pid = fork();
+	int pid = fork();
+
 	if (pid < 0)
 		exit_fatal();
 	else if ( pid == 0 )
@@ -190,10 +188,10 @@ int	end_pipe( List *list, char **envp, int *fds)
 		exit_cmd_error(list->data[0]);
 	}
 	close(fds[0]);
-	return (pid);
+	return pid;
 }
 
-int	pipe_exec( List **list, char **envp )
+int		pipe_exec( List **list, char **envp )
 {
 	int pid, status, fds[2];
 
@@ -211,27 +209,27 @@ int	pipe_exec( List **list, char **envp )
 	return (status);
 }
 
-int exec_cmd( List *list, char **envp )
+int		exec_cmd( List *list, char **envp )
 {
-	int exit;
+	int ret;
 
 	while (list)
 	{
 		if (list->type != PIPE)
-			exit = simple_exec( &list, envp );
+			ret = simple_exec( &list, envp );
 		else
-			exit = pipe_exec( &list, envp );
+			ret = pipe_exec( &list, envp );
 	}
 	clear_list(g_list);
-	return (exit);
+	return (ret);
 }
 
-int	main(int ac, char **av, char **envp)
+int		main( int ac, char **av, char **envp )
 {
 	List list;
 
 	if (ac == 1)
-		return (0);
+		return 0;
 	parser( &list, av, ac );
 	g_list = list.next;
 	return (exec_cmd(list.next, envp));
