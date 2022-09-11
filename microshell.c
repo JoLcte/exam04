@@ -2,6 +2,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <stdio.h>
+
 typedef struct s_list List;
 
 enum _types
@@ -28,16 +30,6 @@ int	ft_strlen( char const *s )
 	return (s - save);
 }
 
-void	error_print( char const *cmd )
-{
-	write(2, "error: cannot execute ", 22);
-	if (!cmd)
-		write(2, "\"\"", 2);
-	else
-		write(2, cmd, ft_strlen(cmd));
-	write(2, "\n",1);
-}	
-
 void	clear_list( List *list )
 {
 	List *tmp = list;
@@ -47,23 +39,35 @@ void	clear_list( List *list )
 		free(tmp);
 		tmp = list;
 	}
-	write(2, "done\n", 5);
 }
 
 void	push_list( List **list, char **av, int size, int type )
 {
 	if ( !( (*list)->next = malloc(sizeof(List)) ) )
 	{
-		write(2, "error: fatal\n", 13);
-		clear_list(g_list);
-		exit(1);
-	}
+			}
 	(*list) = (*list)->next;
 	(*list)->type = type;
 	(*list)->data = av - size;
 	if (type)
 		*av = NULL; // why ?
 	(*list)->next = NULL;
+}
+
+void	exit_fatal( void )
+{
+	write(2, "error: fatal\n", 13);
+	clear_list(g_list);
+	exit(1);
+}
+
+void	exit_cmd_error( char const *cmd )
+{
+	write(2, "error: cannot execute ", 22);
+	write(2, cmd, ft_strlen(cmd));
+	write(2, "\n",1);
+	clear_list(g_list);
+	exit(127);
 }
 
 void	parser( List *list, char **av, int ac )
@@ -94,17 +98,11 @@ int	simple_exec( List **list, char **envp )
 	int pid, status;
 
 	if ( ( pid = fork() ) < 0 )
-	{
-		write(2, "error: fatal\n", 13);
-		clear_list(g_list);
-		exit(1);
-	}
+		exit_fatal();
 	if (pid == 0)
 	{
 		execve((*list)->data[0], (*list)->data, envp);
-		error_print((*list)->data[0]);
-		clear_list(g_list);
-		exit(127);
+		exit_cmd_error((*list)->data[0]);
 	}
 	status = 0;
 	waitpid(pid, &status, WUNTRACED);
@@ -116,29 +114,20 @@ void	start_pipe( List *list, char **envp, int *fds )
 {
 	int pid;
 
-	if ( ((pipe(fds)) < 0) || ((pid = fork()) < 0) )
+	if ( (pipe(fds)) < 0 )
+		exit_fatal();
+	pid = fork();
+	if (pid < 0)
+		exit_fatal();
+	else if ( pid == 0 )
 	{
-		write(2, "error: fatal\n", 13);
-		clear_list(g_list);
-		exit (1);
-	}
-	if ( pid == 0 )
-	{
-		if ( !(list->data[0]) )
-		{
-			error_print(list->data[0]);
-			clear_list(g_list);
-			exit(1);
-		}
 		dup2(fds[1], 1);
 		close(fds[0]);
 		close(fds[1]);
 		close(0); // ?
 		execve( list->data[0], list->data, envp );
-		error_print(list->data[0]);
 		close(fds[1]);
-		clear_list(g_list);
-		exit(127);
+		exit_cmd_error(list->data[0]);
 	}
 	close(fds[1]);
 }
@@ -148,24 +137,21 @@ void	mid_pipe( List *list, char **envp, int *fds )
 	int pid;
 	int old_in = fds[0];
 
-
-	if ( ( (pipe(fds)) < 0 ) || ( (pid = fork()) < 0 ))
-	{
-		write(2, "error: fatal\n", 13);
-		clear_list(g_list);
-		exit (1);
-	}
-	if ( pid == 0 )
+	if ( (pipe(fds)) < 0 )
+		exit_fatal();
+	pid = fork();
+	if (pid < 0)
+		exit_fatal();
+	else if ( pid == 0 )
 	{
 		dup2(old_in, 0);
 		dup2(fds[1], 1);
 		close(fds[0]);
 		close(fds[1]);
 		close(old_in);
+		dprintf(2, "coucou\n");
 		execve( list->data[0], list->data, envp );
-		error_print(list->data[0]);
-		clear_list(g_list);
-		exit(127);
+		exit_cmd_error(list->data[0]);
 	}
 	close(old_in);
 	close(fds[1]);
@@ -174,23 +160,17 @@ void	mid_pipe( List *list, char **envp, int *fds )
 int	end_pipe( List *list, char **envp, int *fds)
 {
 	int pid;
-
 	
-	if ( ( (pipe(fds)) < 0) || ( (pid = fork()) < 0 ) )
-	{
-		write(2, "error: fatal\n", 13);
-		clear_list(g_list);
-		exit (1);
-	}
-	if ( pid == 0 )
+	pid = fork();
+	if (pid < 0)
+		exit_fatal();
+	else if ( pid == 0 )
 	{
 		dup2(fds[0], 0);
 		close(fds[0]);
 		close(fds[1]);
 		execve(list->data[0], list->data, envp);
-		error_print(list->data[0]);
-		clear_list(g_list);
-		exit(127);
+		exit_cmd_error(list->data[0]);
 	}
 	close(fds[0]);
 	return (pid);
