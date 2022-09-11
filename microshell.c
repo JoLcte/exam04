@@ -3,8 +3,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <stdio.h>
-
 typedef struct s_list List;
 
 enum _types
@@ -42,19 +40,6 @@ void	clear_list( List *list )
 	}
 }
 
-void	push_list( List **list, char **av, int size, int type )
-{
-	if ( !( (*list)->next = malloc(sizeof(List)) ) )
-	{
-			}
-	(*list) = (*list)->next;
-	(*list)->type = type;
-	(*list)->data = av - size;
-	if (type)
-		*av = NULL; // why ?
-	(*list)->next = NULL;
-}
-
 void	exit_fatal( void )
 {
 	write(2, "error: fatal\n", 13);
@@ -69,6 +54,18 @@ void	exit_cmd_error( char const *cmd )
 	write(2, "\n",1);
 	clear_list(g_list);
 	exit(127);
+}
+
+void	push_list( List **list, char **av, int size, int type )
+{
+	if ( !( (*list)->next = malloc(sizeof(List)) ) )
+		exit_fatal();
+	(*list) = (*list)->next;
+	(*list)->type = type;
+	(*list)->data = av - size;
+	if (type)
+		*av = NULL; //for execve to stop
+	(*list)->next = NULL;
 }
 
 void	parser( List *list, char **av, int ac )
