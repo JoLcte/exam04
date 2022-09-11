@@ -145,7 +145,6 @@ void	start_pipe( List *list, char **envp, int *fds )
 		close(fds[0]);
 		close(fds[1]);
 		execve( list->data[0], list->data, envp );
-		close(fds[1]);
 		exit_cmd_error(list->data[0]);
 	}
 	close(fds[1]);
