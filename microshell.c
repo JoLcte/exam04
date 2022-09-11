@@ -3,6 +3,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <stdio.h>
+
 typedef struct s_list List;
 
 enum _types
@@ -112,8 +114,14 @@ int		_cd( List **list )
 
 int		simple_exec( List **list, char **envp )
 {
-	int pid, status;
+	int pid;
+	int status = 0;
 
+	if ( !(*list)->data[0] )
+	{
+		*list = (*list)->next;
+		return (0);
+	}
 	if ( strcmp((*list)->data[0], "cd") == 0 )
 		return ( _cd(list) );
 	if ( (pid = fork()) < 0 )
@@ -123,7 +131,6 @@ int		simple_exec( List **list, char **envp )
 		execve((*list)->data[0], (*list)->data, envp);
 		exit_cmd_error((*list)->data[0]);
 	}
-	status = 0;
 	waitpid(pid, &status, WUNTRACED);
 	*list = (*list)->next;
 	return (status);
