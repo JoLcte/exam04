@@ -92,24 +92,22 @@ void	parser( List *list, char **av, int ac )
 	push_list( &list, av + j, 0, CMD );
 }
 
-int		_cd( List **list )
+int		_cd( List *list )
 {
-	int ret = 0;
-
-	if ( !((*list)->data[1]) || (*list)->data[2] )
-	{
+	int ret;
+	if ( !((list)->data[1]) || (list)->data[2] )
+	{ 
 		write(2, "error: cd: bad arguments\n", 25);
-		ret = 2;
+		return 1;
 	}
-	else if ( chdir((*list)->data[1]) )
+	if ( chdir((list)->data[1]) )
 	{
 		write(2, "error: cd: cannot change directory to ", 38);
-		write(2, (*list)->data[1], ft_strlen((*list)->data[1]));
+		write(2, (list)->data[1], ft_strlen((list)->data[1]));
 		write(2, "\n", 1);
-		ret = 2;
+		return 1;
 	}
-	(*list) = (*list)->next;
-	return ret;
+	return 0;
 }
 
 int		simple_exec( List **list, char **envp )
@@ -123,7 +121,11 @@ int		simple_exec( List **list, char **envp )
 		return (0);
 	}
 	if ( strcmp((*list)->data[0], "cd") == 0 )
-		return ( _cd(list) );
+	{
+		pid = _cd(*list);
+		*list = (*list)->next;
+		return pid;
+	}
 	if ( (pid = fork()) < 0 )
 		exit_fatal();
 	if ( pid == 0 )
